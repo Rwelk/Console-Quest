@@ -1,77 +1,577 @@
 # play_game.py
 # This is the file the player will call to play the game.
 
-import os
-import sys
-import random
-import base64
+# import os
+# import sys
+# import base64
 from time import sleep
 from pathlib import Path
 from graphics import *
-from colored_text import *
-from town import town
-
-# Introducing: Console Quest!
-os.system('clear')
-print("""\033[32m
-  _____
- |  _  |       ___   ___   _   _    ____   ___   _     ____        / \ 
- | |_| |      /  _| | _ | |  \| |  |  __| | _ | | |   | ___|      / //
- |_____|\     | |_  ||_|| | |\  |  _\ \   ||_|| | |_  | __|      / //
-      \  \    \___| |___| |_| \_| |___/   |___| |___| |____|    / //
-       \  \    --------------------------------------------    / //
-        \  \        ___    _  _   ____    ____   _____        / //
-         \  \      | _ |  | || | | ___|  |  __| |_   _|    __/_//
-          \  \     ||_||_ | || | | __|   _\ \     | |     /___  \ 
-           \  \    |____/ |____| |____| |___/     |_|      /\/\_|
-            \  \    ----------------------------------    /\/
-             \__\                                        /_/
+# from colored_text import *
+# from town import town
+from objects import *
 
 
-""")
 
-sleep(1)
 
-# Initiate to dictionary that holds all the variables.
-# This gets overwritten when the player creates a new character or loads one in.
-# There is also a dictionary for the enemy stats.
-stat = {
-	'p_name': 'None',
-	'p_class': 'None',
-	'p_LV': 3,
-	'ATT': 0,
-	'ATT_type': 'None',
-	'p_DEF': 0,
-	'current_HP': 0,
-	'base_HP': 0,
-	'current_exp': 0,
-	'next_level_exp': 4,
-	'potions': 0,
-	'p_G': 0,
-	'quest': 0,
-	'magic_weapon': "None",
-	'mwc': False,
-	'magic_weaponer': 'Blacksmith',
-	'magic_item_type': 'Ore',
-	'magic_item': 0,
-	'shield': False,
-	'rathat': False,
-	'shopbro': -1,
-	'p_left': 0,
-	'fairies': 0,
-	'inn': 0,
-	'orc': False,
-	'user': 'None'
-	}
 
-e_stat = {  
-	'e_type': "None",
-	'e_DEF': 0,
-	'e_HP': 0,
-	'e_LV': 1,
-	'e_EXP': 0,
-	'e_G': 0,
-	}
+def main():
+
+	# Introducing: Console Quest!
+
+	title = Text(Point(500, 125), "")
+	title.setAnchor("c")
+	title.setText("""
+     _____                                                                   
+    |  _  |       ___   ___   _   _    ____   ___   _     ____        / \    
+    | |_| |      /  _| | _ | |  \| |  |  __| | _ | | |   | ___|      / //    
+    |_____|\     | |_  ||_|| | |\  |  _\ \   ||_|| | |_  | __|      / //     
+         \  \    \___| |___| |_| \_| |___/   |___| |___| |____|    / //      
+          \  \    --------------------------------------------    / //       
+           \  \        ___    _  _   ____    ____   _____        / //        
+            \  \      | _ |  | || | | ___|  |  __| |_   _|    __/_//         
+             \  \     ||_||_ | || | | __|   _\ \     | |     /___  \         
+              \  \    |____/ |____| |____| |___/     |_|      /\/\_|         
+               \  \    ----------------------------------    /\/             
+                \__\                                        /_/              
+	""")
+	# title.setStyle("bold")
+	title.setFont("courier")
+	title.draw(gw)
+	# sleep(1)
+
+	# If the player has a previous save state, they have the option of loading it in to skip the introduction, player creation, and story.
+	if Path('save_state.txt').exists():
+		while True:
+			menu_background = Rectangle(Point(15, 325), Point(485, 485))
+			menu_background.setFill("white")
+			menu_background.draw(gw)
+
+			menu_text = Text(Point(60, 405), "")
+			menu_text.setText("New Game\nLoad Game\nQuit")
+			menu_text.setSize(28)
+			menu_text.setFont("courier")
+			menu_text.draw(gw)
+
+			selector = Polygon(Point(30, 354), Point(30, 374), Point(50, 364))
+			selector.setFill("red")
+			selector.draw(gw)
+			selection = 0
+
+			while True:
+				key = gw.checkKey().lower()
+
+				if key != "":
+					if key in ["space", "return"]:
+						break
+
+					elif key in ["up", "w"]:
+						selection = (selection - 1) % 3
+						if selection != 2:
+							selector.move(0, -40)
+						else:
+							selector.move(0, 80)
+
+
+					elif key in ["down", "s"]:
+						selection = (selection + 1) % 3
+						if selection != 0:
+							selector.move(0, 40)
+						else:
+							selector.move(0, -80)
+
+
+			for i in range(3):
+				gw.items[-1].undraw()
+
+			# Start new game
+			if selection == 0:
+				# Because they already have a save file, and making a new one would would overwrite it, ask for certainty
+				menu_background.draw(gw)
+				certainty_text = menu_text.clone()
+				certainty_text.setText("Are you sure?\nThis may overwrite the \nold save file!\n\n    Yes		No")
+				certainty_text.move(-35, 0)
+				certainty_text.draw(gw)
+
+				certainty_selector = Polygon(Point(60, 454), Point(60, 474), Point(80, 464))
+				certainty_selector.setFill("red")
+				certainty_selector.draw(gw)
+				certainty_selection = True
+
+				while True:
+					key = gw.checkKey().lower()
+
+					if key != "":
+						if key in ["space", "return"]:
+							break
+
+						elif key in ["up", "w", "left", "a", "down", "s", "right", "d"]:
+							# The player was hovering over "Yes"
+							if certainty_selection:
+								certainty_selector.move(190, 0)
+							# The player was hovering over "No"
+							else:
+								certainty_selector.move(-190, 0)
+							certainty_selection = not certainty_selection
+
+
+
+				if certainty_selection:
+					print("Yes")
+				else:
+					print("No")
+				print()
+				print()
+				print()
+				# new_game()
+				pass
+
+			# Load the saved game.
+			if selection == 1:
+				# load_game()
+				pass
+
+			# Quit out of the game
+			if selection == 2:
+				return
+
+
+	# Else, the player is opening the game for the first time, and we need to go through player creation and story.
+	else:
+		sleep(1)
+		player_select(quest_stats)
+		story()
+
+	town()
+
+
+		
+	return
+
+	# Initiate to dictionary that holds all the variables.
+	# This gets overwritten when the player creates a new character or loads one in.
+	# There is also a dictionary for the enemy stats.
+	
+
+	# The actual 'game' per se starts here.
+	
+	new_game_break = False
+	while True:
+		print_yellow(" [N]ew Game    [L]oad Game    [C]lose\n")
+		x = input(' >>> ').lower()
+		print()
+		if x!='n' and x!='l' and x!='c':
+			invalid()
+
+		# New Game
+		# If the player wants to start from scratch, they can do so here.
+		# I wanted to make sure they knew what they were doing, and are asked one more time to make sure.
+		elif x=='n':
+			print_white(" Are you sure?")
+			while True:
+				print_yellow(" [Y]es    [N]o\n")
+				x = input(' >>> ').lower()
+				print()
+				if x!='y' and x!='n':
+					invalid()
+
+				elif x=='y':
+					new_game_break = True
+					tutorial(stat)
+					player_select(stat)
+					story()
+					break
+
+				else:
+					break
+
+		# Load Game
+		# The player will load from the save file, titled "save_state.txt".
+		# It is encoded in base64, so they can't just change their stats if they want to.
+		# As such, the program has to pull the string, convert it to bytes, decode the bytes, and convert it back into a list of strings.
+		elif x=='l':
+			save_state = Path('save_state.txt')
+			save = str(base64.decodebytes(save_state.read_text().encode('utf-8')).decode())
+			save = save.split(", ")
+
+			stat['p_name'] = str(save[0])
+			stat['p_class'] = str(save[1])
+			stat['p_LV'] = int(save[2])
+			stat['ATT'] = int(save[3])
+			stat['ATT_type'] = str(save[4])
+			stat['p_DEF'] = int(save[5])
+			stat['current_HP'] = int(save[6])
+			stat['base_HP'] = int(save[7])
+			stat['current_exp'] = int(save[8])
+			stat['next_level_exp'] = int(save[9])
+			stat['potions'] = int(save[10])
+			stat['p_G'] = int(save[11])
+			stat['quest'] = int(save[12])
+			stat['magic_weapon'] = str(save[13])
+			stat['mwc'] = save[14] == 'True'
+			stat['magic_weaponer'] = str(save[15])
+			stat['magic_item_type'] = str(save[16])
+			stat['magic_item'] = int(save[17])
+			stat['shield'] = save[18] == 'True'
+			stat['rathat'] = save[19] == 'True'
+			stat['shopbro'] = int(save[20])
+			stat['p_left'] = int(save[21])
+			stat['fairies'] = int(save[22])
+			stat['inn'] = int(save[23])
+			stat['orc'] = save[24] == 'True'
+			stat['user'] = str(save[25])
+			break
+
+		else:
+			return
+
+		if new_game_break == True: break
+
+
+	# If the player has never played before, this runs the three introduction functions.
+	
+
+
+	# The main body of the program is stored in another function, called town in the town.py file.
+	town(stat, e_stat)
+
+	# Once the player has beaten the orc, town return the control back to here, to end the game.
+	
+	print()
+	if stat['current_HP'] < (stat['base_HP']/4):
+		print_white(" After a close battle, you've defeated the orc!")
+		sleep(2)
+	else:
+		print_white(" At long last, the village is free from its enemy.")
+		sleep(2)
+
+	print_white(" When you return with the news, you are showered with gratitude.")
+	sleep(3)
+	print_white(" A big party is put on in your honor!")
+	sleep(2)
+	print_white(" Afterwards, you fall asleep in the inn, perhaps for the last time.")
+	sleep(3)
+	print("\n Z",end=""), sleep(.8), print("z",end=""), sleep(.8), print("z",end=""), sleep(.8), print(".",end=""), sleep(.8), print(".",end=""), sleep(.8), print(".\n\n",end=""), sleep(1.2)
+	print_white(" Upon waking up, you decide to say some final goodbyes before leaving.\n")
+	sleep(2.75)
+
+	# The player is given the option to talk to some, all, or none of the important villagers they've met to say some final goodbyes.
+	shopkeep = False
+	innkeep = False
+	weaponer = False
+	w = stat['magic_weaponer']
+	while True:
+		if shopkeep == False: print_yellow(" [S]hopkeep")
+		else: print(" [S]hopkeep", end="")
+
+		if innkeep == False: print_yellow("    [I]nnkeep")
+		else: print("    [I]nnkeep", end="")
+
+		if weaponer == False: print_yellow("    ["+w[0]+']'+w[1:])
+		else: print("    ["+w[0]+']'+w[1:], end="")
+
+		print_yellow("    [L]eave\n")
+		x = input(' >>> ').lower()
+		print()
+		if x!='s' and x!='i' and x!=w[0].lower() and x!='l':
+			invalid()
+
+
+		elif x=='s':
+			if shopkeep == False:
+				shopkeep = True
+				print_cyan(" Gotta say, you've been one fine customer, "+stat['p_name']+".\n")
+				sleep(3)
+				print_cyan(" We'll all forever be in you're gratitude.\n")
+				sleep(3)
+
+				if stat['shopbro'] == 1 or stat['shopbro'] == 3:
+					print_cyan("\n Me especially, the handsomer brother.\n")
+					sleep(2.75)
+					print_cyan(" We both know I'm more handsome.\n")
+					sleep(2)
+					print_cyan(" No, I clearly am.\n")
+					sleep(2)
+					print_cyan(" Nu uh!\n")
+					sleep(1)
+					print_cyan(" Ya huh!\n")
+					sleep(1)
+					print_cyan(" Nu uh!\n")
+					sleep(1)
+					print_cyan(" Ya huh!\n")
+					sleep(1)
+					while True:
+						print_cyan(" Nu uh!\n")
+						sleep(1)
+						print_yellow(' [G]uys!\n')
+						x = input(' >>> ').lower()
+						print()
+						if x=='g':
+							break
+						print_cyan(" Ya huh!\n")
+						sleep(1)
+						print_yellow(' [G]uys!\n')
+						x = input(' >>> ').lower()
+						print()
+						if x=='g':
+							break
+					print_cyan(" Sorry.") 
+				print_cyan(" Thanks again for everything. Don't be a stranger!\n\n")
+				sleep(4)
+
+			else:
+				print_white(" You've already said your goodbyes to the Shopkeep.\n")
+				sleep(1)
+
+
+		elif x=='i':
+			if innkeep == False:
+
+				innkeep = True
+				print_green(" Thanks for everything, "+stat['p_name']+"!\n")
+				sleep(2.5)
+				print_green(" Hey, did you ever find those fairies?\n")
+				while True:
+					print_yellow(" [I] did!    [N]ope, never.\n")
+					x = input(' >>> ').lower()
+					print()
+					if x!='i' and x!='n':
+						invalid()
+
+					elif x=='i':
+						print_green(" Really? I guess my dad really was telling the truth.\n")
+						sleep(2)
+						print_green(" I've been thinking about going out on my own adventure to look for\n")
+						print_green(" them myself.\n")
+						sleep(4.5)
+						print_green(" Now that I know they're out there, I want to see them with my own eyes.\n")
+						sleep(4)
+						break
+
+					else:
+						print_green(" Well, I still hold out hope they're out there.\n")
+						sleep(3)
+						print_green(" I've actually been preparing for my own excursion into the forest.\n")
+						sleep(3)
+						print_green(" Now that the orc's gone, I want to try to find those fairies myself.\n")
+						sleep(3)
+						print_green(" You've inspired me to go out and prove my father's tale was true.\n")
+						sleep(3)
+
+						break
+
+				print_green(" Anyways, if you ever find yourself in the neighborhood, let me put\n")
+				print_green(" you up for the night!\n\n")
+				sleep(4)
+
+			else:
+				print_white(" You've already said your goodbyes to the Innkeep.\n")
+				sleep(1)
+
+
+		elif x==w[0].lower():
+			if weaponer == False:
+				weaponer = True
+				print_magenta(" Welcome back, "+stat['p_name']+"!\n")
+				sleep(2)
+				print_magenta(" Last night was some party, huh?\n")
+				sleep(2)
+				if stat['mwc'] == True:
+					if stat['magic_weapon'] == "Vorpal Daggers": print_magenta(" Listen, I've been thinking, and I think I have a theory on how to make\n those")
+					else: print_magenta(" Listen, I've been thinking, and I think I have a theory on how to make\n that")
+					print_magenta(" "+stat['magic_weapon']+" even better.\n")
+					sleep(4.5)
+					print_magenta(" I'll need a lot more time to research about it, though.\n")
+					sleep(3)
+					print_magenta(" Come back in a few years, and I know I'll have something good!\n\n")
+					sleep(3)
+				else:
+					print_magenta(" I'm still working on figuring out that new weapon.\n")
+					sleep(3)
+					print_magenta(" If you ever find youself back here, drop on by.\n")
+					sleep(3)
+					print_magenta(" It might finally be done then!\n\n")
+					sleep(3)
+				
+			else:
+				print_white(" You've already said your goodbyes to the ", w, ".\n")
+				sleep(1)
+
+
+		else:
+			if innkeep == False and shopkeep == False and weaponer == False:
+				print_white(" Deciding not to trouble the villagers any longer,", stat['p_name'], "suits up and")
+				print_white(" heads off for the next adventure!")
+			else:
+				print_white(" Having said their final goodbyes, the villagers wave as", stat['p_name'], "heads on")
+				print_white(" to the next adventure!")
+			
+			break
+
+	print("\n ------------------------------------------------------------------------\n")
+	sleep(6)
+
+
+	# If this is the second, third, or nth time playing the game, this dialogue directly from me will play.
+	if Path('Hall of Fame.txt').exists():
+		print_white(" Hey, it's Jeffrey again!")
+		sleep(3)
+		print_white(" I can't believe you cared so much that you'd play my game start to")
+		print_white(" finish again.")
+		sleep(5)
+		print_white(" I don't really have anything special for you this time around.")
+		sleep(4)
+		print_white(" Oh! How about this?")
+		sleep(1)
+
+		# Here, I give the player a gold star with the graphics library.
+		win = GraphWin("Star", 1000, 1000)
+		win.setBackground('grey')
+		win.setCoords(-3.0, -3.0, 3.0, 3.0)
+
+		p1 = Point(0, 2.618)
+		p2 = Point(0.5878, 0.809)
+		p3 = Point(2.4899, 0.809)
+		p4 = Point(0.9511, -0.309)
+		p5 = Point(1.5388, -2.118)
+		p6 = Point(0, -1)
+		p7 = Point(-1.5388, -2.118)
+		p8 = Point(-0.9511, -0.309)
+		p9 = Point(-2.4899, 0.809)
+		p10 = Point(-0.5878, 0.809)
+
+		star = Polygon(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
+		star.setWidth(5)
+		star.setFill('yellow')
+		star.draw(win)
+		
+		print_white(" It's a gold star for your efforts!")
+		sleep(3)
+		print_white(" I hope it made this all worthwhile.")
+		sleep(3)
+		print("\n .", end=''), sleep(1.5), print(".", end=''), sleep(1.5), print(".\n\n", end=''), sleep(1.5)
+		print_white(" So... when I said to go out on your own adventure, I didn't mean to")
+		print_white(" just start a new game.")
+		sleep(4)
+		print_white(" Go out and DO something.")
+		sleep(2)
+		print_white(" Personally, as a Boy Scout, I recommend camping.")
+		sleep(3)
+		print_white(" Get some friends to go with you, and it can be a great experience.")
+		sleep(3.5)
+		print_white(" What are you waiting for?")
+		sleep(3)
+		print_white(" The world is an oyster, and it's your job to crack it open!")
+		sleep(5)
+
+
+	# If this is the first time the player has beaten the game, this dialogue from me will play.
+	else:
+		print_white(" Thanks for playing this game, ", stat['user'], ".")
+		sleep(4)
+		print_white(" I'm the creator, Jeffrey.")
+		sleep(2)
+		print_white(" Making this game has been a real experience for me, and I'm so happy I")
+		print_white(" got to share it with you.")
+		sleep(5)
+		print_white(" This started out as a small project for one of my classes, and spiraled")
+		print_white(" WAY out of control!")
+		sleep(5)
+		print_white(" I just want to thank you for taking the time to play all of it.")
+		sleep(3.75)
+		print_white(" If you want to dive into the code, I have a ton of comments that make up")
+		print_white(" a running commentary of my experiences.")
+		sleep(6)
+		print_white(" Oh, and before I forget, in the folder this is contained in, there'll be")
+		print_white(" a file that contains ", stat['p_name'], "'s stats after beating the orc.")
+		sleep(6)
+		print_white(""" It's in 'Hall of Fame.txt' """)
+		sleep(4)
+		print_white(" There,", stat['p_name'], "will be immortalized, for as long as this folder")
+		print_white(" exists and you don't go changing it.")
+		sleep(5)
+		print_white(" Anyways, this is truly good bye.")
+		sleep(3)
+		print_white(" I hope you have a wonderful rest of the day, as you head on to you're")
+		print_white(" own next adventure!")
+		sleep(5.5)
+
+	# When the player beats the game for the first time, a file titled "Hall of Fame.txt" is created that saves the character data.
+	# All the stats as of the end of the orc battle, like potions and whatnot, are saved.
+	# It is opened with 'a' so the previous wins are not overwritten.
+	halloffame = open(Path('Hall of Fame.txt'),'a')
+
+
+	while len(stat['p_name']) <8:
+		stat['p_name'] = stat['p_name']+" "
+
+	y = "Lv. "+str(stat['p_LV'])
+	while len(y)<6:
+		y = " "+y
+
+	z = stat['p_class']
+	while len(z)<15:
+		z = z+" "
+		if len(z)<15:
+			z = " "+z
+
+	a = str(stat['current_exp'])+"/"+str(stat['next_level_exp'])
+	while len(a) <5:
+		a = " "+a
+	b = str(stat['current_HP'])+"/"+str(stat['base_HP'])
+	while len(b) <5:
+		b = " "+b
+	c = str(stat['p_DEF'])
+	while len(c) <2:
+		c = " "+c
+	d = str(stat['potions'])
+	if len(d) <2:
+		d = " "+d
+	e = str(stat['p_G'])
+	if len(e) <2:
+		e = " "+e
+		
+	if stat['magic_weapon'] == 'Damascus Sword': f =" Dam. Sword: "
+	elif stat['magic_weapon'] == "Warlock Staff": f =" War. Staff: "
+	else: f = " V. Daggers: "
+
+	if stat['mwc'] == True: g = "X"
+	else: g = "-"
+
+	if stat['shield'] == True: h = "X"
+	else: h = "-"
+
+	if stat['rathat'] == True: i = "X"
+	else: i = "-"
+
+	if stat['shopbro'] == 1 or stat['shopbro'] == 3: j = "X"
+	else: j = "-"
+
+	if stat['fairies'] > 1: k = "X"
+	else: k = "-"
+
+	halloffame.write(
+	"  _________________________________________________________\n"+
+	" |                                                         |\n"+
+	" |  "+stat['p_name']+" "+y+"    Inventory"+"         Side Quests       |"+
+	"\n |  ---------------    --------------    ----------------- |"+
+	"\n |  "+z+"    Potion:     "+d+"    Beat Reginald?  "+i+" |"+
+	"\n |  EXP:      "+a+"    Gold:       "+e+"    Saved Daniel?   "+j+" |"+
+	"\n |  HP:       "+b+"    "+str(stat['magic_item_type'])+":	    "+str(stat['magic_item'])+"    Found Fairies?  "+k+" |"+
+	"\n |  ATT:         "+str(stat['ATT'])+"   "+f+" "+g+"                      |"+
+	"\n |  DEF:         "+c+"    Shield:      "+h+"                      |"+
+	"\n |_________________________________________________________|\n\n")
+
+	stat['p_name'] = stat['p_name'].replace(" ", "")
+	halloffame.close()
+
+	# After everything, the old save file is deleted so the player can start a new game.
+	# Since "Hall of Fame.txt" now exists, the player can skip the tutorial and go straight into character creation.
+	try:
+		os.remove(Path('save_state.txt'))
+
+	except FileNotFoundError:
+		pass
 
 
 # The tutorial that introduces the player to the "system" and hold to play the game.
@@ -162,7 +662,7 @@ def tutorial(stat):
 			print_white(" Are you sure? Because you're doing it just fine right now.\n")
 			sleep(1)
 
-	os.system('clear')
+	
 	print_white("\n Alright, let's get the game underway.")
 	sleep(3)
 
@@ -197,7 +697,7 @@ def player_select(stat):
 				stat['base_HP'] = 17
 				stat['potions'] = 2
 				stat['p_G'] = 2
-				stat['magic_weapon'] = 'Damascus Sword'
+				stat['magic_weapon'] = 'Thunder Blade'
 				stat['p_left'] = 4
 				break
 
@@ -212,7 +712,7 @@ def player_select(stat):
 				stat['base_HP'] = 20
 				stat['potions'] = 2
 				stat['p_G'] = 2
-				stat['magic_weapon'] = "Warlock Staff"
+				stat['magic_weapon'] = "Blaze Rod"
 				stat['p_left'] = 4
 				stat['magic_weaponer'] = 'Wizard'
 				stat['magic_item_type'] = 'Wood'
@@ -258,7 +758,7 @@ def player_select(stat):
 
 		print_white(" You will play as ")
 
-		print_magenta(stat['p_name'] + "the" + stat['p_class'])
+		print_magenta(stat['p_name'] + " the " + stat['p_class'])
 
 		print_white("!\n")
 		sleep(2)
@@ -273,14 +773,14 @@ def player_select(stat):
 			elif x=='y':
 				return stat
 			else:
-				os.system('clear')
+				
 				print()
 				break
 
-	
+		
 # The story potion introduces the player to the world and vaguely outlines what they need to do.
 def story():
-	os.system('clear')
+	
 	print_white("\n Alright, here's the lowdown.")
 	sleep(1.5)
 	print_white(" You work at the Adventurer's Guild in the city of Krocus.")
@@ -312,427 +812,25 @@ def story():
 
 
 
-# The actual 'game' per se starts here.
-# If the player has a previous save state, they have the option of loading it it skip the introduction, player creation, and story.
-if Path('save_state.txt').exists():
-	new_game_break = False
-	while True:
-		print_yellow(" [N]ew Game    [L]oad Game    [C]lose\n")
-		x = input(' >>> ').lower()
-		print()
-		if x!='n' and x!='l' and x!='c':
-			invalid()
-
-		# New Game
-		# If the player wants to start from scratch, they can do so here.
-		# I wanted to make sure they knew what they were doing, and are asked one more time to make sure.
-		elif x=='n':
-			print_white(" Are you sure?")
-			while True:
-				print_yellow(" [Y]es    [N]o\n")
-				x = input(' >>> ').lower()
-				print()
-				if x!='y' and x!='n':
-					invalid()
-
-				elif x=='y':
-					new_game_break = True
-					tutorial(stat)
-					player_select(stat)
-					story()
-					break
-
-				else:
-					break
-
-		# Load Game
-		# THe player will load from the save file, titled "save_state.txt".
-		# It is encoded in base64, so they can't just change their stats if they want to.
-		# As such, the program has to pull the string, convert it to bytes, decode the bytes, and convert it back into a list of strings.
-		elif x=='l':
-			save_state = Path('save_state.txt')
-			save = str(base64.decodebytes(save_state.read_text().encode('utf-8')).decode())
-			save = save.split(", ")
-
-			stat['p_name'] = str(save[0])
-			stat['p_class'] = str(save[1])
-			stat['p_LV'] = int(save[2])
-			stat['ATT'] = int(save[3])
-			stat['ATT_type'] = str(save[4])
-			stat['p_DEF'] = int(save[5])
-			stat['current_HP'] = int(save[6])
-			stat['base_HP'] = int(save[7])
-			stat['current_exp'] = int(save[8])
-			stat['next_level_exp'] = int(save[9])
-			stat['potions'] = int(save[10])
-			stat['p_G'] = int(save[11])
-			stat['quest'] = int(save[12])
-			stat['magic_weapon'] = str(save[13])
-			stat['mwc'] = save[14] == 'True'
-			stat['magic_weaponer'] = str(save[15])
-			stat['magic_item_type'] = str(save[16])
-			stat['magic_item'] = int(save[17])
-			stat['shield'] = save[18] == 'True'
-			stat['rathat'] = save[19] == 'True'
-			stat['shopbro'] = int(save[20])
-			stat['p_left'] = int(save[21])
-			stat['fairies'] = int(save[22])
-			stat['inn'] = int(save[23])
-			stat['orc'] = save[24] == 'True'
-			stat['user'] = str(save[25])
-			break
-
-		else:
-			sys.exit(0)
-
-		if new_game_break == True: break
-
-
-# If the player has never played before, this runs the three introduction functions.
-else:
-	sleep(1)
-	tutorial(stat)
-	player_select(stat)
-	story()
-
-
-# The main body of the program is stored in another function, called town in the town.py file.
-town(stat, e_stat)
-
-# Once the player has beaten the orc, town return the control back to here, to end the game.
-os.system('clear')
-print()
-if stat['current_HP'] < (stat['base_HP']/4):
-	print_white(" After a close battle, you've defeated the orc!")
-	sleep(2)
-else:
-	print_white(" At long last, the village is free from its enemy.")
-	sleep(2)
-
-print_white(" When you return with the news, you are showered with gratitude.")
-sleep(3)
-print_white(" A big party is put on in your honor!")
-sleep(2)
-print_white(" Afterwards, you fall asleep in the inn, perhaps for the last time.")
-sleep(3)
-print("\n Z",end=""), sleep(.8), print("z",end=""), sleep(.8), print("z",end=""), sleep(.8), print(".",end=""), sleep(.8), print(".",end=""), sleep(.8), print(".\n\n",end=""), sleep(1.2)
-print_white(" Upon waking up, you decide to say some final goodbyes before leaving.\n")
-sleep(2.75)
-
-# The player is given the option to talk to some, all, or none of the important villagers they've met to say some final goodbyes.
-shopkeep = False
-innkeep = False
-weaponer = False
-w = stat['magic_weaponer']
-while True:
-	if shopkeep == False: print_yellow(" [S]hopkeep")
-	else: print(" [S]hopkeep", end="")
-
-	if innkeep == False: print_yellow("    [I]nnkeep")
-	else: print("    [I]nnkeep", end="")
-
-	if weaponer == False: print_yellow("    ["+w[0]+']'+w[1:])
-	else: print("    ["+w[0]+']'+w[1:], end="")
-
-	print_yellow("    [L]eave\n")
-	x = input(' >>> ').lower()
-	print()
-	if x!='s' and x!='i' and x!=w[0].lower() and x!='l':
-		invalid()
-
-
-	elif x=='s':
-		if shopkeep == False:
-			shopkeep = True
-			print_cyan(" Gotta say, you've been one fine customer, "+stat['p_name']+".\n")
-			sleep(3)
-			print_cyan(" We'll all forever be in you're gratitude.\n")
-			sleep(3)
-
-			if stat['shopbro'] == 1 or stat['shopbro'] == 3:
-				print_cyan("\n Me especially, the handsomer brother.\n")
-				sleep(2.75)
-				print_cyan(" We both know I'm more handsome.\n")
-				sleep(2)
-				print_cyan(" No, I clearly am.\n")
-				sleep(2)
-				print_cyan(" Nu uh!\n")
-				sleep(1)
-				print_cyan(" Ya huh!\n")
-				sleep(1)
-				print_cyan(" Nu uh!\n")
-				sleep(1)
-				print_cyan(" Ya huh!\n")
-				sleep(1)
-				while True:
-					print_cyan(" Nu uh!\n")
-					sleep(1)
-					print_yellow(' [G]uys!\n')
-					x = input(' >>> ').lower()
-					print()
-					if x=='g':
-						break
-					print_cyan(" Ya huh!\n")
-					sleep(1)
-					print_yellow(' [G]uys!\n')
-					x = input(' >>> ').lower()
-					print()
-					if x=='g':
-						break
-				print_cyan(" Sorry.") 
-			print_cyan(" Thanks again for everything. Don't be a stranger!\n\n")
-			sleep(4)
-
-		else:
-			print_white(" You've already said your goodbyes to the Shopkeep.\n")
-			sleep(1)
-
-
-	elif x=='i':
-		if innkeep == False:
-
-			innkeep = True
-			print_green(" Thanks for everything, "+stat['p_name']+"!\n")
-			sleep(2.5)
-			print_green(" Hey, did you ever find those fairies?\n")
-			while True:
-				print_yellow(" [I] did!    [N]ope, never.\n")
-				x = input(' >>> ').lower()
-				print()
-				if x!='i' and x!='n':
-					invalid()
-
-				elif x=='i':
-					print_green(" Really? I guess my dad really was telling the truth.\n")
-					sleep(2)
-					print_green(" I've been thinking about going out on my own adventure to look for\n")
-					print_green(" them myself.\n")
-					sleep(4.5)
-					print_green(" Now that I know they're out there, I want to see them with my own eyes.\n")
-					sleep(4)
-					break
-
-				else:
-					print_green(" Well, I still hold out hope they're out there.\n")
-					sleep(3)
-					print_green(" I've actually been preparing for my own excursion into the forest.\n")
-					sleep(3)
-					print_green(" Now that the orc's gone, I want to try to find those fairies myself.\n")
-					sleep(3)
-					print_green(" You've inspired me to go out and prove my father's tale was true.\n")
-					sleep(3)
-
-					break
-
-			print_green(" Anyways, if you ever find yourself in the neighborhood, let me put\n")
-			print_green(" you up for the night!\n\n")
-			sleep(4)
-
-		else:
-			print_white(" You've already said your goodbyes to the Innkeep.\n")
-			sleep(1)
-
-
-	elif x==w[0].lower():
-		if weaponer == False:
-			weaponer = True
-			print_magenta(" Welcome back, "+stat['p_name']+"!\n")
-			sleep(2)
-			print_magenta(" Last night was some party, huh?\n")
-			sleep(2)
-			if stat['mwc'] == True:
-				if stat['magic_weapon'] == "Vorpal Daggers": print_magenta(" Listen, I've been thinking, and I think I have a theory on how to make\n those")
-				else: print_magenta(" Listen, I've been thinking, and I think I have a theory on how to make\n that")
-				print_magenta(" "+stat['magic_weapon']+" even better.\n")
-				sleep(4.5)
-				print_magenta(" I'll need a lot more time to research about it, though.\n")
-				sleep(3)
-				print_magenta(" Come back in a few years, and I know I'll have something good!\n\n")
-				sleep(3)
-			else:
-				print_magenta(" I'm still working on figuring out that new weapon.\n")
-				sleep(3)
-				print_magenta(" If you ever find youself back here, drop on by.\n")
-				sleep(3)
-				print_magenta(" It might finally be done then!\n\n")
-				sleep(3)
-			
-		else:
-			print_white(" You've already said your goodbyes to the ", w, ".\n")
-			sleep(1)
-
-
-	else:
-		if innkeep == False and shopkeep == False and weaponer == False:
-			print_white(" Deciding not to trouble the villagers any longer,", stat['p_name'], "suits up and")
-			print_white(" heads off for the next adventure!")
-		else:
-			print_white(" Having said their final goodbyes, the villagers wave as", stat['p_name'], "heads on")
-			print_white(" to the next adventure!")
-		
-		break
-
-print("\n ------------------------------------------------------------------------\n")
-sleep(6)
-
-
-# If this is the second, third, or nth time playing the game, this dialogue directly from me will play.
-if Path('Hall of Fame.txt').exists():
-	print_white(" Hey, it's Jeffrey again!")
-	sleep(3)
-	print_white(" I can't believe you cared so much that you'd play my game start to")
-	print_white(" finish again.")
-	sleep(5)
-	print_white(" I don't really have anything special for you this time around.")
-	sleep(4)
-	print_white(" Oh! How about this?")
-	sleep(1)
-
-	# Here, I give the player a gold star with the graphics library.
-	win = GraphWin("Star", 1000, 1000)
-	win.setBackground('grey')
-	win.setCoords(-3.0, -3.0, 3.0, 3.0)
-
-	p1 = Point(0, 2.618)
-	p2 = Point(0.5878, 0.809)
-	p3 = Point(2.4899, 0.809)
-	p4 = Point(0.9511, -0.309)
-	p5 = Point(1.5388, -2.118)
-	p6 = Point(0, -1)
-	p7 = Point(-1.5388, -2.118)
-	p8 = Point(-0.9511, -0.309)
-	p9 = Point(-2.4899, 0.809)
-	p10 = Point(-0.5878, 0.809)
-
-	star = Polygon(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
-	star.setWidth(5)
-	star.setFill('yellow')
-	star.draw(win)
 	
-	print_white(" It's a gold star for your efforts!")
-	sleep(3)
-	print_white(" I hope it made this all worthwhile.")
-	sleep(3)
-	print("\n .", end=''), sleep(1.5), print(".", end=''), sleep(1.5), print(".\n\n", end=''), sleep(1.5)
-	print_white(" So... when I said to go out on your own adventure, I didn't mean to")
-	print_white(" just start a new game.")
-	sleep(4)
-	print_white(" Go out and DO something.")
-	sleep(2)
-	print_white(" Personally, as a Boy Scout, I recommend camping.")
-	sleep(3)
-	print_white(" Get some friends to go with you, and it can be a great experience.")
-	sleep(3.5)
-	print_white(" What are you waiting for?")
-	sleep(3)
-	print_white(" The world is an oyster, and it's your job to crack it open!")
-	sleep(5)
 
 
-# If this is the first time the player has beaten the game, this dialogue from me will play.
-else:
-	print_white(" Thanks for playing this game, ", stat['user'], ".")
-	sleep(4)
-	print_white(" I'm the creator, Jeffrey.")
-	sleep(2)
-	print_white(" Making this game has been a real experience for me, and I'm so happy I")
-	print_white(" got to share it with you.")
-	sleep(5)
-	print_white(" This started out as a small project for one of my classes, and spiraled")
-	print_white(" WAY out of control!")
-	sleep(5)
-	print_white(" I just want to thank you for taking the time to play all of it.")
-	sleep(3.75)
-	print_white(" If you want to dive into the code, I have a ton of comments that make up")
-	print_white(" a running commentary of my experiences.")
-	sleep(6)
-	print_white(" Oh, and before I forget, in the folder this is contained in, there'll be")
-	print_white(" a file that contains ", stat['p_name'], "'s stats after beating the orc.")
-	sleep(6)
-	print_white(""" It's in 'Hall of Fame.txt' """)
-	sleep(4)
-	print_white(" There,", stat['p_name'], "will be immortalized, for as long as this folder")
-	print_white(" exists and you don't go changing it.")
-	sleep(5)
-	print_white(" Anyways, this is truly good bye.")
-	sleep(3)
-	print_white(" I hope you have a wonderful rest of the day, as you head on to you're")
-	print_white(" own next adventure!")
-	sleep(5.5)
+if __name__ == "__main__":
+	try:
+		main()
+	except:
+		save_state = Path('save_state.txt')
+		line_to_save = ''
+		stats_to_save = [stat['p_name'], stat['p_class'], stat['p_LV'], stat['ATT'], stat['ATT_type'],
+			stat['p_DEF'], stat['current_HP'], stat['base_HP'], stat['current_exp'], stat['next_level_exp'],
+			stat['potions'], stat['p_G'], stat['quest'], stat['magic_weapon'], stat['mwc'],
+			stat['magic_weaponer'], stat['magic_item_type'], stat['magic_item'], stat['shield'], stat['rathat'],
+			stat['shopbro'], stat['p_left'], stat['fairies'], stat['inn'], stat['orc'], stat['user']]
 
-# When the player beats the game for the first time, a file titled "Hall of Fame.txt" is created that saves the character data.
-# All the stats as of the end of the orc battle, like potions and whatnot, are saved.
-# It is opened with 'a' so the previous wins are not overwritten.
-halloffame = open(Path('Hall of Fame.txt'),'a')
+		for i in stats_to_save:
+			line_to_save = line_to_save + str(i) + ", "
 
+		save_state.write_text(str(base64.standard_b64encode(line_to_save[:-2].encode('utf-8')))[2:-1])
 
-while len(stat['p_name']) <8:
-    stat['p_name'] = stat['p_name']+" "
-
-y = "Lv. "+str(stat['p_LV'])
-while len(y)<6:
-	y = " "+y
-
-z = stat['p_class']
-while len(z)<15:
-	z = z+" "
-	if len(z)<15:
-		z = " "+z
-
-a = str(stat['current_exp'])+"/"+str(stat['next_level_exp'])
-while len(a) <5:
-    a = " "+a
-b = str(stat['current_HP'])+"/"+str(stat['base_HP'])
-while len(b) <5:
-    b = " "+b
-c = str(stat['p_DEF'])
-while len(c) <2:
-    c = " "+c
-d = str(stat['potions'])
-if len(d) <2:
-    d = " "+d
-e = str(stat['p_G'])
-if len(e) <2:
-    e = " "+e
-    
-if stat['magic_weapon'] == 'Damascus Sword': f =" Dam. Sword: "
-elif stat['magic_weapon'] == "Warlock Staff": f =" War. Staff: "
-else: f = " V. Daggers: "
-
-if stat['mwc'] == True: g = "X"
-else: g = "-"
-
-if stat['shield'] == True: h = "X"
-else: h = "-"
-
-if stat['rathat'] == True: i = "X"
-else: i = "-"
-
-if stat['shopbro'] == 1 or stat['shopbro'] == 3: j = "X"
-else: j = "-"
-
-if stat['fairies'] > 1: k = "X"
-else: k = "-"
-
-halloffame.write(
-"  _________________________________________________________\n"+
-" |                                                         |\n"+
-" |  "+stat['p_name']+" "+y+"    Inventory"+"         Side Quests       |"+
-"\n |  ---------------    --------------    ----------------- |"+
-"\n |  "+z+"    Potion:     "+d+"    Beat Reginald?  "+i+" |"+
-"\n |  EXP:      "+a+"    Gold:       "+e+"    Saved Daniel?   "+j+" |"+
-"\n |  HP:       "+b+"    "+str(stat['magic_item_type'])+":	    "+str(stat['magic_item'])+"    Found Fairies?  "+k+" |"+
-"\n |  ATT:         "+str(stat['ATT'])+"   "+f+" "+g+"                      |"+
-"\n |  DEF:         "+c+"    Shield:      "+h+"                      |"+
-"\n |_________________________________________________________|\n\n")
-
-stat['p_name'] = stat['p_name'].replace(" ", "")
-halloffame.close()
-
-# After everything, the old save file is deleted so the player can start a new game.
-# Since "Hall of Fame.txt" now exists, the player can skip the tutorial and go straight into character creation.
-try:
-	os.remove(Path('save_state.txt'))
-
-except FileNotFoundError:
-	pass
+		print("Wuh-oh, something went horribly wrong!")
+		print("I saved your game for you before everything crashed, so it should be all good.")

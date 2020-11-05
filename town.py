@@ -1,162 +1,143 @@
 # town.py
 # The program here is for exploring the town, and, when ready, leaving for the forest.
-# The player can visit the shop to buy a shiled and potions, the inn to heal up, and the Weaponer to make the upgraded weapon.
-# They can also drink a potion in safety, save their game, and quit if they want to leave.
+# The player can visit the shop to buy a shiled and potions, the inn to heal up, and the Weapon Maker to make the upgraded weapon.
+# They can also drink a potion in safety, 
 
-import os
-import sys
-import random
-import base64
-from time import sleep
+from random import randint, random
 from pathlib import Path
-from colored_text import *
-from random_encounters import exploring
-from leveling_system import check_stats
+from tkinter import constants
+
+from numpy import loadtxt
+from numpy.lib.npyio import savetxt
+from map import exploring, save_and_close
+from objects import *
+from level_creation_tool import fetch_level
+from PIL import Image as PIL_Image
+
+MAPS = Path(__file__).parent.absolute() / "maps"
 
 
 
 # This is the function that triggers when the player goes to the shop to buy stuff.
-def shop(stat):
+def shop():
 
-	# The shopkeep will always speak in cyan.
-	os.system('clear')
-	print()
+	gold_box.show()
 
-	# The price of potions. It changes if you meet and help the shopkeep's brother Daniel in the forest.
-	pprice = 10		
+	# The default price of potions. This changes if you meet and help the shopkeep's brother Daniel in the forest.
+	pprice = 10
 
-	if stat['shopbro'] == 1 or stat['shopbro'] == 3:
+	# If the player succeeded the shopbro quest, they will see this special dialogue when they enter the shop.
+	if game_stats['shopbro'] == 1 or game_stats['shopbro'] == 3:
 		pprice = 7
 
-		if stat['shopbro'] != 3:
-			stat['shopbro'] = 3
-			print_cyan(" Hey there! I heard you bumped into my brother in the forest.")
-			sleep(2)
-			print_cyan(" He might not be as awesome as me, but I still love the guy.")
-			sleep(2)
-			print_cyan(" I'll lower their price a little for you.\n")
-			sleep(2.25)
-			pprice = 15
+		if game_stats['shopbro'] != 3:
+			game_stats['shopbro'] = 3
 
-	# However, if the player is unable to save Daniel, the Shopkeep is in a much more dour mood.
-	# Additionally, he only has 4 potions left in stock, meaning the only way to obtain more is to find them from destroyed caravans while exploring.
-	elif stat['shopbro'] == 2:
-		stat['shopbro'] = 4
-		print_cyan(" Hey there. It's been a rough day.")
-		sleep(2)
-		print_cyan(" I just found out that my brother Daniel was found dead.")
-		sleep(2)
-		print_cyan(" Since he was the one that made my potions, I don't have many left.")
-		sleep(2.25)
-		print_cyan(" I'll try to keep acting chipper though.")
-		sleep(2)
-		print_cyan(" Thanks for hearing me out.\n")
-		sleep(2)
+			dialogue("Hey there! I heard you bumped into my brother in the forest.", [], "cyan")
+			dialogue("He might not be as awesome as me, but I still love the guy.", [], "cyan")
+			dialogue("I'll lower their price a little for you.", [], "cyan")
+
+	# However, if the player failed to save Daniel, the Shopkeep has this dialogue instead.
+	elif game_stats['shopbro'] == 2:
+		game_stats['shopbro'] = 4
+
+		dialogue("Hey there. It's been a rough day.", [], "cyan")
+		dialogue("I just my brother Daniel was recently found dead in the forest.", [], "cyan")
+		dialogue("Since he was the one that made my potions, I don't have many left.", [], "cyan")
+		dialogue("I'll try to keep acting chipper though.", [], "cyan")
+		dialogue("Thanks for hearing me out.", [], "cyan")
 
 
 	# The shopkeep David introduces himself the first time the player comes to his shop.
-	if stat['shopbro'] == -1:
-		print_cyan(" Welcome to my shop!")
-		sleep(1)
-		print_cyan(" You must be that adventurer the town's been buzzing about.")
-		sleep(1.5)
-		print_cyan(" I'm the shopkeep, and town's best-looking dude. The name's David.")
-		sleep(3)
-		print_cyan(" What can I do for you?\n")
-		sleep(.4)
+	# game_stats["shopbro"] is used to keep track of if this is the first time the player has visited the shop.
+	# There is more dialogue that plays for the first time the player leaves the shop, so it is updated there rather than here.
+	if game_stats['shopbro'] == -1:		
+		dialogue("Welcome to my shop!", [], "cyan")
+		dialogue("You must be that adventurer the town's been buzzing about.", [], "cyan")
+		dialogue("I'm the shopkeep, and town's best-looking dude. The name's David.", [], "cyan")
+		line = "What can I do for you?"
 
 	# If the player has come before, David just gives this short line:
-	else: print_cyan(" Welcome back to my shop! Is there anything you want?\n")
+	else:
+		line = "Welcome back to my shop! Is there anything you want?"
 
-
-	# These loops are what allow the player to input their actions.
-	# It accounts for both upper and lower case, and prevents the player from inputing an invalid action.
-	# There are a ton like this one in the document, so I will only explain how it works here.
+	
+	
+	# Placing while loop to keep player in the menus until they want to leave.
 	while True:
 
-		# What the player can input. Note that they can only use [B] [S], or [L].
-		print(" You currently have: " + "\033[32m" + str(stat['p_G'])+"G")
-		print_yellow(" [B]uy    [S]ell    [L]eave")
-		x = input(' >>> ').lower()
-		print()
-		
-		# If the player tries to use something that isn't [B] [S], or [L]:
-		if x!='b' and x!='s' and x!='l':
-			invalid()
+		x = dialogue(line, ["Buy", "Sell", "Leave"], "cyan")
 
-		# Everything that follows after is the meat of what happens when the player inputs their action.
 		# This part here is for buying stuff.  
-		elif x=='b':
-			sleep(.5)
+		if x == 0:
+
 			while True:
+				
+				x = dialogue("Here's what I have in stock.",[
+					"Shield: 30G",
+					f"Potions: {pprice}G{' ' + str(game_stats['p_left']) if game_stats['shopbro'] == 4 else ''}",
+					"Information",
+					"Back",
+				], "cyan")
 
-				print("     You currently have: " + "\033[32m" + str(stat['p_G']) + "G")
-				if stat['shopbro'] == 4:
-					print_yellow("     [S]hield: 30G    [P]otions: " + str(pprice) + "G (" + str(stat['p_left']) + ")    [I]nformation    [R]eturn")					
-				else:	
-					print_yellow("     [S]hield: 30G    [P]otions: " + str(pprice) + "G    [I]nformation    [R]eturn")
-				b = input('     >>> ').lower()
-				print()
-
-				if b!='s' and b!='p' and b!='i' and b!='r':
-					print('     ', end="")
-					invalid()
 				# Getting a shield.
-				elif b=='s':
-					if stat['p_G'] < 30:
-						print('     ', end=""), print_cyan("You'll need more money for that.\n")
-						sleep(1)
-					elif stat['shield'] == 1:
-						print('     ', end=""), print_cyan("Looks like you already have a mighty fine shield there.")
-						sleep(2)
-						print('     ', end=""), print_cyan("Whoever gave you it must've been a really handsome dude.\n")
-						sleep(2.5)
+				if x == 0:
+					# The player doesn't have enough money
+					if player.gold < 30: dialogue("You'll need more money for that.", [], "cyan")
+					# The player already has a shield in their inventory.
+					elif player.items["Shield"] == 1:
+						dialogue("Looks like you already have a mighty fine shield there.", [], "cyan")
+						dialogue("Whoever gave you it must've been a really handsome dude.", [], "cyan")
+					# The player buys a shield.
 					else:
-						stat['p_G'] -= 30
-						stat['shield'] += 1
-						stat['p_DEF'] += 3
-						print('     ', end=""), print_cyan("Thanks for your purchase!\n")
-						sleep(.7)
-						print('     ', end="")
-						print_white("DEF just rose by ")
-						print_green("3!\n")
-						sleep(1)
+						player.gold -= 30
+						gold_box.update(player.gold)
+						player.items["shield"] = 1
+						player.DEF += 3
+						dialogue("Thanks for your purchase!", [], "cyan")
+						dialogue("DEF just rose by 3!")
 
 				# Getting potions.
-				elif b=='p':
+				elif x == 1:
 
-					if stat['shopbro'] == 2 and stat['p_left'] == 0:
-						print('     ', end=""), print_cyan("Sorry, I'm all out of potions.\n")
-						sleep(.7)
+					# The player failed the shopbro quest and the shop is out of stock.
+					if game_stats['shopbro'] == 2 and game_stats['p_left'] == 0:
+						dialogue("Sorry, I'm all out of potions.")
 
-					elif stat['p_G'] < pprice:
-						print('     ', end=""), print_cyan("You'll need more money for that.\n")
-						sleep(.7)
+					# The player doesn't have enough money.
+					elif player.gold < pprice: dialogue("You'll need more money for that.", [], "cyan")
+					
+					# The player buys a potion.
 					else:
-						stat['p_G'] -= pprice		
-						stat['potions'] += 1
-						print('     ', end=""), print_cyan("Thanks for your purchase!\n")
-						if stat['shopbro'] == 2: stat['p_left'] -= 1	
-						sleep(.7)
+						player.gold -= pprice
+						gold_box.update(player.gold)		
+						player.items["Potions"] += 1
+						dialogue("Thanks for your purchase!", [], "cyan")
+						
+						# If the player failed the shopbro quest, take away a potion from stock.
+						if game_stats['shopbro'] == 2: game_stats['p_left'] -= 1
 
-				# Getting information, in case the player didn't read the manual.
-				elif b=='i':
-					print('         ', end=""), print_cyan("What do you wanna know?")
+				# Getting information.
+				elif x == 3:
 					while True:
 
-						print_yellow('         [S]hield    [P]otions    [R]eturn')
-						i = input('         >>> ').lower()
-						print()
-						if i!='S' and i!='s' and i!='P' and i!='p' and i!='R' and i!='r':
-							invalid()
-						elif i=='S' or i=='s':
-							print('         ', end=""), print_cyan("The shield will increase your your DEF by 3.\n")
-							sleep(1)
-						elif i=='P' or i=='p':
-							print('         ', end=""), print_cyan("Potions will restore your current HP by 17-42 points.\n")
-							sleep(1)
+						x = dialogue("What do you wanna know about?", ["Shield", "Potions", "Fire Scrolls", "Ice Scrolls", "Thunder Scrolls", "Back"], "cyan")
+
+						if x == 0:
+							dialogue("The shield will increase your your DEF some.", [], "cyan")
+						elif x == 1:
+							dialogue("Potions will restore your HP by several points.", [], "cyan")
+						elif x == 2:
+							dialogue("Fire Scrolls will burn up any trees.", [], "cyan")
+						elif x == 3:
+							dialogue("Ice Scrolls will freeze bodies of water.", [], "cyan")
+						elif x == 4:
+							dialogue("Thunder Scrolls will shatterer rocks.", [], "cyan")
+						# Return to the Buy Menu
 						else:
 							break
+
+				# Return to the Buy/Sell Menu		
 				else:
 					break
 
@@ -164,449 +145,548 @@ def shop(stat):
 		# The part for selling stuff.  
 		# Note that the player cannot actually sell anything, since this is, you know, a shop.
 		# As such, this area is completely for humor.
-		elif x=='s':
+		elif x == 1:
 			while True:
 
-				fourth_wall = 0
-				print("     You currently have: " + "\033[32m" + str(stat['p_G']) + "G")
+				line = []
+				sell_amount = {
+					"Shield": "15G", "Potions": "3G",
+					"Fire Scroll": "5G", "Ice Scroll": "5G", "Thunder Scroll": "5G", 
+					"Apples": "1G", "Herbs": "2G", "magic_item": "7G" 
+				}
 
-				print_yellow("     [S]hield: 30G    [P]otions: 10G    [M]agic "+str(stat['magic_item_type'])+": ??G    [R]eturn")
-				s = input('     >>> ').lower()
-				print()
-				if s!='s' and s!='p' and s!='m' and s!='r':
-					print('     ', end="")
-					invalid()
-				elif s=='s':
-					if stat['shield'] <1:
-						print('     ', end=""), print_white("You don't have a shield to sell.\n")
-						sleep(1)
-					else:
-						print('     ', end=""), print_white("That's a really nice shield you have there.")
-						sleep(1.5) 
-						print('     ', end=""), print_white("Are you sure you want to get rid of it?")
-						while True:
+				for i in player.items:
+					i_count = player.items[i]
+					if i_count != 0:
+						if i == "magic_item":
+							item = "Magic Wood" if player.character_class == "Sorcerer" else "Magic Ore"
+							line.append(f"{item} ({i_count}): {sell_amount[i]}")
+						else: line.append(f"{i} ({i_count}): {sell_amount[i]}")
+				line.append("Back")
 
-							if fourth_wall > 0:
-								break
-							print_yellow('     [Y]es    [N]o')
-							y = input('     >>> ').lower()
-							print()
-							if y!='y' and y!='n':
-								invalid()
-							elif y=='y':
-								fourth_wall += 1
-								print('     ', end=""), print_white("Are you really sure?")								
-								while True:
 
-									if fourth_wall > 1:
-										break
-									print_yellow('     [Y]es    [N]o')
-									y = input('     >>> ').lower()
-									print()
-									if y!='y' and y!='n':
-										print('     ', end="")
-										invalid()
-									elif y=='y':
-										fourth_wall += 1
-										print('     ', end=""), print_white("I mean, it's a really nice shield, and there's no real reason to.")
-										while True:
+				x = dialogue("What would you like to sell?", line, "cyan", True)
 
-											if fourth_wall > 2:
-												break
-											print_yellow('     [Y]es    [N]o')
-											y = input('     >>> ').lower()
-											print()
-											if y!='y' and y!='n':
-												print('     ', end="")
-												invalid()
-											elif y=='y':
-												fourth_wall += 1
-												print('     ', end=""), print_white("Your stats'll go down...")
-												while True:
+				if x == "Shield":
+					dialogue("That's a really nice shield you have there.") 
+					if dialogue("Are you sure you want to get rid of it?", ["Yes", "No"]) == 0:	
+						if dialogue("Are you really sure?", ["Yes", "No"]) == 0:
+							if dialogue("I mean, it's a really nice shield, and there's no real reason to.", ["Yes", "No"]) == 0: 
+								if dialogue("Your stats'll go down...", ["Just do it.", "No"]) == 0:
+									if  dialogue("...and you don't really get much money back for it.", ["Sell my shield!", "No"]) == 0:
+										if dialogue("I'm not sure I want to, with that tone of voice.", ["I'm sorry. Please?", "No"]) == 0:
+											dialogue("Alright, since you're so sure.")
+											dialogue("Just don't come crying to me if you die because you're DEF was so low you got hit a bunch of times.")
+											dialogue("You want to return this shield?", [], "cyan")
+											dialogue("Sorry, but I don't take refunds.", [], "cyan")
 
-													if fourth_wall > 3:
-														break
-													print_yellow('     [J]ust do it.    [N]o')
-													y = input('     >>> ').lower()
-													print()
-													if y!='j' and y!='y' and y!='n':
-														invalid()
-													elif y=='j' or y=='y':
-														fourth_wall += 1
-														print('     ', end=""), print_white("...and you don't really get much money back for it.")
-														while True:
+				elif x == "Potions":
+					dialogue("Look man, don't take this personally, but I'm trying to run a business here.", [], "cyan")
+					dialogue("Why the heck would I buy some strange liquid from a rando adventurer I only met like, a few days ago?", [], "cyan")
+					dialogue("Also, I'm pretty sure at least some of this is my own stock.", [], "cyan")
 
-															if fourth_wall > 4:
-																break
-															print_yellow('     [L]et the shopkeep buy my shield!    [N]o')
-															y = input('     >>> ').lower()
-															print()
-															if y!='L' and y!='l' and y!='Y' and y!='y'and y!='N' and y!='n':
-																invalid()
-															elif y=='L' or y=='l' or y=='Y' or y=='y':
-																fourth_wall += 1
-																print('     ', end=""), print_white("I'm not sure I want to, with that tone of voice.")
-																while True:
+				elif x.find("Scroll") != -1:
+					dialogue("Sorry, I already have plent of parchment.", [], "cyan")
 
-																	print_yellow("     [I]'m sorry. Can I just please sell my shield?    [N]o")
-																	y = input('     >>> ').lower()
-																	print()																
-																	if y!='I' and y!='i' and y!='Y' and y!='y'and y!='N' and y!='n':
-																		invalid()
-																	elif y=='I' or y=='i' or y=='Y' or y=='y':
-																		print('     ', end=""), print_white("Alright, since you're so sure.")
-																		sleep(2)
-																		print('     ', end=""), print_white("Just don't come crying to me if you die because you're DEF was")
-																		print('     ', end=""), print_white("so low you got hit a bunch of times.\n")
-																		sleep(3)
-																		print('     ', end=""), print_cyan("You want to return this shield?")
-																		sleep(1)
-																		print('     ', end=""), print_cyan("Sorry, but I don't take refunds.\n")
-																		sleep(1)
-																		break
-															else:
-																break
-													else:
-														break
-											else:
-												break
-									else:
-										break
-							else:
-								break
+				elif x == "Apples":
+					dialogue("TODO: Write Apple Stuff")
+				
+				elif x == "Herbs":
+					dialogue("TODO: Write Herb Stuff")
 
-				elif s=='p':
-					if stat['potions'] <1:
-						print_white("     You don't have any potions to sell.")
-						sleep(1)
-					else:
-						print('     ', end=""), print_cyan("Look man, don't take this personally, but I'm trying to run a")
-						print('     ', end=""), print_cyan("business here.")
-						sleep(1.5)
-						print('     ', end=""), print_cyan("Why the heck would I buy some strange liquid from a rando")
-						print('     ', end=""), print_cyan(" adventurer I only met like, a few days ago?")
-						sleep(1.5)
-						if stat['potions'] >1:
-							print('     ', end=""), print_cyan("Also, I'm pretty sure at least some of this is my own stock.\n")
-							sleep(2)
-				elif s=='m':
-					if stat['magic_item'] <1:
-						print('     ', end=""), print_white("You don't have any magic items to sell.")
-						sleep(1)
-					else:
-						print('     ', end=""), print_cyan("I have no use for magic items, but I think the "+str(stat['magic_weaponer'])+"might")
-						print('     ', end=""), print_cyan("need it for a certain project she's been working on.")
-						sleep(4)
+				elif x == "Magic Ore" or x == "Magic Wood":
+					dialogue(f"I have no use for magic items, but I think the {'Wizard' if player.character_class == 'Sorcerer' else 'Blacksmith'} might need it for a certain project she's been working on.", [], "cyan")
+				
 				else:
 					break
 
 
 		# Let the player leave the shop.
-		elif x=='l':
-			print_cyan(' See you around!\n')
-			sleep(1)
+		elif x == 2:
+			break
 
-			# David will tell the player about his missing brother the first time they come to the shop.
-			if stat['shopbro'] == -1:
-				stat['shopbro'] = 0
-				print_cyan(" By the way, my brother's been missing for several days.")
-				sleep(1)
-				print_cyan(" He's actually the one who makes my potions.")
-				sleep(1)
-				print_cyan(" If you see him, tell him his more handsome brother's worried.\n")
-				sleep(1)
+		line = "Anything else?"
 
-			return stat
+	
+	gold_box.hide()
+	dialogue("See you around!", [], "cyan")
 
-		os.system('clear')
-		print()
+	# As mentioned above, this is the dialogue that play the first time the player leaves the shop.
+	# It starts the Daniel questline, in which the player has to find the shopkeep's brother in the forest.
+	if game_stats['shopbro'] == -1:
+		game_stats['shopbro'] = 0
+		dialogue("By the way, my brother's been missing for several days.", [], "cyan")
+		dialogue("He's actually the one who makes my potions.", [], "cyan")
+		dialogue("If you see him, tell him his more handsome brother's worried.", [], "cyan")
 
 
 
-# This is the code that plays when the player goes to the inn the sleep and reheal.
+# This is the code that plays when the player goes to the inn to sleep and heal.
 # It also begins the fairy sidequest, as the player is unable to meet them before meeting the Innkeep.
-def inn(stat):
+def inn():
 
-	os.system('clear')
-	print("\n You currently have: " + "\033[32m" + str(stat['p_G'])+"G\n")
+	color = "green"
+	staying = False
 
 	# This part plays when the player comes to the inn for the first time.
-	if stat['inn'] == 0:
-		stat['inn'] = 1
-		print_green(" Welcome to my inn.\n")
-		sleep(1.25)
-		print_green(" You're the adventurer here to beat the orc, right?\n")
-		sleep(2)
-		print_green(" Would you like to stay the night?\n")
-		sleep(2)
-		print_green(" It'll cost 7G.\n")
-		sleep(1)
-		print("\n Staying the night will recover all your lost health.")
+	if game_stats["inn_stays"] == -1:
+		game_stats["inn_stays"] = 0
+		dialogue("Welcome to my inn.", [], color)
+		dialogue("You're the adventurer here to beat the orc, right?", [], color)
+		dialogue("Would you like to stay the night?", [], color)
+		dialogue("It'll cost 4G.", [], color)
+		gold_box.show()
+		x = dialogue("Staying the night will recover all your lost health.",  ["Yes (7G)", "No"])
 
 	# This part plays every other time the player visits the inn.
 	else:
-		print_green(" Welcome back! Here for the night again?\n")
+		gold_box.show()
+		x = dialogue("Welcome back! Here for the night again?", ["Yes (4G)", "No"], color)
+	
+	if x == 0:
+		# If their health is already at max, they are reminded, just in case they don't want to waste 7G.
+		if player.current_HP == player.base_HP:
+			x = dialogue("Are you sure? Your HP is already at max.", ["Yes", "No"])
+			if x == 1:
+				dialogue("See you later!", [], color)
+				gold_box.hide()
+				return
 
-	# The actual bit where the player decides whether or not they want to stay.
-	while True:
-		print_yellow(' [Y]es: 7G    [N]o\n')
-		x = input(' >>> ').lower()
-		print()
-		if x!='y' and x!='n':
-			invalid()
-		elif x=='y':
-			# If their health is already at max, they are reminded, just in case they don't want to waste 7G.
-			if stat['current_HP'] == stat['base_HP']:
-				print(" Are you sure? Your HP is already at max.")
-				while True:
-					print_yellow(' [Y]es: 7G    [N]o\n')
-					x = input(' >>> ').lower()
-					print()
-					if x!='y' and x!='n':
-						invalid()
-					elif x=='y':
-						break						
+		# Check to see if the player has enough money.
+		if player.gold < 4:
 
-					else:
-						print_green(" See you later!\n\n")
-						return
-
-			# Check to see if the player has enough money.
-			if stat['p_G'] < 7:
-
-				# If the player is short on cash, but has stayed at the inn seven other times, the fee is waved.
-				# All remaining money is taken, but they can still heal up.
-				if stat['inn'] > 8:
-					print_green(" You've been such a good customer, I'll waive the fee for tonight.\n")
-					sleep(4)
-					print_green(" Just give me what you can, and I'll put the rest on your tab.\n\n")
-					sleep(3)
-					j = True
-
-				else:
-					print_green(" You don't have enough money to stay right now.\n\n")
-					sleep(3)
-					j = False
+			# If the player is short on cash, but has stayed at the inn seven other times, the fee is waved.
+			# All remaining money is taken, but they can still heal up.
+			if game_stats["inn_stays"] > 8:
+				dialogue("You've been such a good customer, I'll waive the fee for tonight.", [], color)
+				dialogue(" Just give me what you can, and I'll put the rest on your tab.", [], color)
+				staying = True
 
 			else:
-				j = True
+				dialogue("You don't have enough money to stay right now.", [], color)
 
-			break
+		else:
+			staying = True
 
-		elif x=='n':
-			j = False
-			break
 
 	# If the player has deicided to stay, or the Innkeep has allowed them to.
-	if j == True:
-		stat['inn'] += 1
-		stat['p_G'] -= 7
-		if stat['p_G'] < 0:
-			stat['p_G'] = 0
+	if staying:
+		game_stats["inn_stays"] += 1
+		player.gold -= 4
+		if player.gold < 0:
+			player.gold = 0
+
+		gold_box.update(player.gold)
 
 		# This line for the final part of the Magic Weapon Quest.
-		# The player has to go do something else to give the Weaponer some time to make the weapon.
-		if stat['quest'] == 2: stat['quest'] = 3
+		# The player has to go do something else to give the Weapon Maker some time to make the weapon.
+		if game_stats["magic_weapon_status"] == 2: game_stats["magic_weapon_status"] = 3
+
 
 		# Just a small touch, the player is directed to 1 of 4 rooms to sleep in.
-		x = random.randint(1,4)
-		if x == 1: print_green(" Your room is right down the hall, second door on the left.\n\n")
-		elif x == 2: print_green(" Your room is up the stairs, third door on the right.\n\n")
-		elif x == 3: print_green(" Your room is right down the hall, first door on the right.\n\n")
-		elif x == 4: print_green(" Your room is up the stairs, first door on the left.\n\n")
-		sleep(2)
+		x = randint(1,4)
+		if x == 1: dialogue("Your room is right down the hall, second on the left.", [], color)
+		elif x == 2: dialogue(" Your room is up the stairs, third on the right.", [], color)
+		elif x == 3: dialogue(" Your room is right down the hall, first on the right.", [], color)
+		elif x == 4: dialogue(" Your room is up the stairs, third on the left.", [], color)
+
 
 		# The HP is restored to max, and a short sleep cycle is played.
-		stat['current_HP'] = stat['base_HP']
-		print(" Z",end=""), sleep(.6), print("z",end=""), sleep(.6), print("z",end=""), sleep(.6),  print(".",end=""), sleep(.6), print(".",end=""), sleep(.6), print(".\n",end=""), sleep(1)
-		print(" Health fully restored!\n")
-		sleep(1.75)
+		player.current_HP = player.base_HP
+
+		dialogue("Zzz...", [])
+		dialogue("Zzzzz...", [])
+		dialogue("Zzzzzzz...", [])
+		dialogue("Health fully restored!", [])
 
 	# If the player has not talked to the Innkeep about the fairies yet, this section will begin that sidequest for the thrid part of the game.
-	if stat['fairies'] == 0 and stat['inn'] > 1:
-		stat['fairies'] = 1
-		print(" As you're about to leave, the Innkeep waves you down.\n")
-		sleep(2.5)
-		print_green(" You haven't heard of the mischievous fairies, have you?\n")
-		sleep(2)
-		print_green(" My father used to tell me tales of how deep in the forest, he and his\n")
-		print_green(" adventuring party discovered a cave with fairies in it.\n")
-		sleep(5)
-		print_green(" When offered a brightly colored juice, some of them became stronger\n")
-		print_green(" than ever before.\n")
-		sleep(5)
-		print_green(" However, a couple others oddly turned weaker.\n")
-		sleep(1.75)
-		print_green(" The other villagers always mocked him for that story, all the way to\n")
-		print_green(" his grave.\n")
-		sleep(4)
-		print_green(" It's always been a dream of mine to prove him right.\n")
-		sleep(2.75)
-		print_green(" If you ever do, please tell me about them.\n")
-		sleep(3)
-		print_green(" Alright, see you later!\n\n")
-		sleep(2.5)
-		return stat
+	if not game_stats['fairies'] and game_stats["inn_stays"] > 1:
+		game_stats['fairies'] = True
+		dialogue("As you're about to leave, the Innkeep waves you down.", [])
+		dialogue(" You haven't heard of the mischievous fairies, have you?", [], color)
+		dialogue(" My father used to tell me tales of how deep in the forest, he and his adventuring party discovered a cave with fairies in it.", [], color)
+		dialogue(" When offered a brightly colored juice, some of them became stronger than ever before.", [], color)
+		dialogue(" However, a couple others oddly turned weaker.", [], color)
+		dialogue(" The other villagers always mocked him for that story, all the way to his grave.", [], color)
+		dialogue(" It's always been a dream of mine to prove him right.", [], color)
+		dialogue(" If you ever do see them, please tell me where they are.", [], color)
+		dialogue(" Alright, see you later!", [], color)
+		return
 		
-	print_green(" See you around!\n\n")
-	sleep(2)
-	return stat
+	dialogue("See you around!", [], color)
+	gold_box.hide()
+	return
 
 
 
-# This is the code that plays when the player goes to their Weaponer to make a better weapon.
-def magic_maker(stat):
+# This is the code that plays when the player goes to their Weapon Maker to make a better weapon.
+def weapon_maker():
 
-	os.system('clear')
-	print()
+	# Based on the character's class, they might see the Blacksmith, or the Wizard.
+	# Both has slightly different dialogue, so the changes are loaded in here.
+	blacksmith = False if player.character_class == 'Sorcerer' else True
+	cue = ["forge", "Ore", "3", "hammer out"] if blacksmith else ["shop", "Wood", "5", "carve up"]
 
-	# This plays the first time the player meets the Weaponer.
-	# This was the original sidequest, which is why its dictionary definition is generically 'quest' while all the others have special names.
-	# So like, this was the only one I was going to implement, but I ended up wanting to make the other characters more important too, so... yeah.
-	# Created side quests for them too, and now here we are.
-	# It was WAY too much, but ehh.
-	if stat['quest'] == 0:
+	# Show the gold_box if the player is on either of the first two steps of this quest.
+	if game_stats["magic_weapon_status"] < 2: gold_box.show()
+	
 
-		stat['quest'] = 1
-		print_magenta(" Hello there! Welcome to my")
-		if stat['magic_weaponer'] == 'Blacksmith': print_magenta(" forge.\n")
-		else: print_magenta(" workshop.\n")
-		sleep(2.75)
-		print_magenta(" You must be that adventurer who's here to kill that orc.\n")
-		sleep(3.25)
-		print_magenta(" "+stat['p_name']+", was it?\n")
-		sleep(2)
-		print_magenta(" I'm currently working on a project you might be able to help with.\n")
-		sleep(3.5)
-		print_magenta(" In the forest you might come across some Magic ")
-		if stat['magic_weaponer'] == 'Blacksmith': print_magenta("Ore.\n")
-		else: print_magenta("Wood.\n")
-		sleep(3.5)
+	# This plays the first time the player meets the Weapon Maker.
+	if game_stats["magic_weapon_status"] == 0:
 
-		# In case the player has already found magic items in the forest before meeting the Weaponer:
-		if stat['magic_item'] >0:
+		game_stats["magic_weapon_status"] = 1
 
-			print("\n Wait! Didn't you pick some up some "+stat['magic_item_type']+" earlier?")
-			while True:
-				print_yellow(" [L]ike this?\n")
-				x = input(' >>> ').lower()
-				print()
-				if x!='l':
-					invalid()
-				else:
-					print_magenta(" Yes, that's it!\n")
-					sleep(1)
-					break
+		dialogue(f"Hello there! Welcome to my {cue[0]}.", [], "magenta")
+		dialogue("You must be that adventurer who's here to kill that orc.", [], "magenta")
+		dialogue(f"{player.name}, was it?", [], "magenta")
+		dialogue("I'm the one who makes the shields that the shop sells.", [], "magenta")
+		dialogue("I'm currently working on a project you might be able to help with.", [], "magenta")
+
+		# It's possible the player has already found magic items in the forest before meeting the Weapon Maker.
+		# If so, this instance of dialogue will have a line that the player can say, with a response from the Weapon Maker.
+		x = dialogue(f"In the forest you might come across some Magic {cue[1]}.", ["Like this?"] if player.items[3][1] > 0 else [], "magenta")
+		if x == 0:
+			dialogue("Yes, that's it!", [], "magenta")
+		
 
 		# The Sword and Daggers only need 3 Ore, while the Staff needs 5 Wood.
-		if stat['magic_weaponer'] == 'Blacksmith': print_magenta(" If you can gather up 3 of 'em and 25G, I'll be able to hammer out")
-		else: print_magenta(" If you can gather up 5 of 'em and 25G, I'll be able to carve up")
-		print_magenta("a\n special weapon.\n")
-		stat['quest'] = 1
+		dialogue(f"If you can gather up {cue[2]} of 'em and 25G, I'll be able to {cue[3]} a special weapon.", ["You can count on me!"], "magenta")
+		dialogue(f"Great! I'll see you later!", [], "magenta")
 
-		while True:
-			print_yellow(" [Y]ou can count on me!\n")
-			x = input(' >>> ').lower()
-			print()
-			if x!='y':
-				invalid()
+
+	# When the player returns to the Weapon Maker, this dialogue plays.
+	elif game_stats["magic_weapon_status"] == 1:
+
+		x = dialogue("How's the search coming?", ["Got everything right here.", "Still searching."], "magenta")
+			
+		# If they claim to have everything, the Weapon Maker checks.
+		if x == 0:
+
+			# In case the player is missing some ore and/or gold, she will tell them what they need.
+			if (blacksmith and player.items[3][1] < 3) or ((not blacksmith) and player.items[3][1] < 5) or player.gold < 25:
+				
+				# The Weapon Maker's line starts out with the following text, and will be built from here.
+				string = " Hold on, you're still missing "
+				also = False
+
+				# If the player is missing magic items, that is appended to "string".
+				# Also, for proper grammar the boolean "also" is set to true.
+				if blacksmith and player.items[3][1] < 3:
+					string += f"{3 - player.items[3][1]} Ore"
+					also = True
+				elif (not blacksmith) and player.items[3][1] < 5:
+					string += f"{5 - player.items[3][1]} Wood"
+					also = True
+
+				# If the above append triggered, and the player is also missing gold, append the word "and" to "string"
+				if also == True and player.gold < 25: string += " and "
+
+				# If the player is missing gold, append the amount to "string".
+				if player.gold < 25: string += f"{25 - player.gold}G"
+
+				# Finally, append a period for proper punctuation.
+				string += "."
+
+				# Now that the full line has been built, pass that in as the Weapon Maker's dialogue.
+				dialogue(string, [], "magenta")
+				dialogue("Come back when you've gotten everything. I'm itching to get started!", [], "magenta")
+
+
+			# Else if everything is in order, the Weapon Maker will start making the weapon.
 			else:
-				print_magenta(" Great! I'll see you later!\n\n")
-				sleep(1.5)
-				break
+				game_stats["magic_weapon_status"] = 2
+				if blacksmith: player.items[3][1] -= 3
+				else: player.items[3][1]-= 5
+				player.gold -= 25
+
+				gold_box.update(player.gold)
+
+				dialogue("Sweet! I'll get right to it.", [], "magenta")
+				dialogue("Come back a little later, and it should be done!", [], "magenta")
 
 
-	# When the player returns to the Weaponer, this dialogue plays.
-	elif stat['quest'] == 1:
+		# Else the player tells the Weapon Maker they don't have everything, thereby leaving the area and returning to town.
+		# The Weapon Maker will remind the player what they need.
+		else:
+			dialogue("Well then I'll leave you to it.", [], "magenta")
+			dialogue(f"Remember, you need {cue[2]} {cue[1]} and 25 G.", [], "magenta")
 
-		print_magenta(" How's the search coming?\n")
-		while True:
-			print_yellow(" [G]ot everything right here.    [S]till searching.\n")
-			x = input(' >>> ').lower()
-			print()
-			if x!='g' and x!='s':
-				invalid()
-			# If they claim to have everything, the Weaponer checks.
-			elif x=='g':
 
-				# In case the player is missing some ore and/or gold, she will tell them what they need.
-				if (stat['magic_weaponer'] == 'Blacksmith' and stat['magic_item'] <3) or (stat['magic_weaponer'] == 'Wizard' and stat['magic_item'] <5) or stat['p_G'] <25:
-					print_magenta(" Hold on, you're still missing ")
-					also = False
-					if stat['magic_weaponer'] == 'Blacksmith' and stat['magic_item'] <3:
-						print_magenta(str(3-stat['magic_item'])+" Ore")
-						also = True
-					else:
-						print_magenta(str(5-stat['magic_item'])+" Wood")
-						also = True
-
-					if also == True and stat['p_G'] <25: print_magenta(" and ")
-
-					if stat['p_G'] <25: print_magenta(str(25-stat['p_G'])+"G")
-
-					print_magenta(".\n")
-					sleep(3.5)
-
-					print_magenta(" Come back when you've gotten everything. I'm itching to get started!\n\n")
-					sleep(3)
-					return
-
-				# But if everything is in order, the Weaponer will get underway immediately.
-				else:
-					if stat['magic_weaponer'] == 'Blacksmith': stat['magic_item'] -= 3
-					else: stat['magic_item'] -= 5
-					stat['p_G'] -= 20
-					print_magenta(" Sweet! I'll get right to it.\n")
-					sleep(3)
-					print_magenta(" Come back a little later, and it should be done!\n\n")
-					stat['quest'] = 2
-					sleep(3.5)
-					return stat
-
-			# The player tells the Weaponer they don't have everything, thereby leaving the area and returning to town proper.
-			# The Weaponer will remind the player what they need.
-			elif x=='s':
-				print_magenta(" Well then I'll leave you to it.\n")
-				sleep(1.75)
-				if stat['magic_weaponer'] == 'Blacksmith': print_magenta(" Remember, you need 3 Ore and 50 G.\n\n")
-				else: print_magenta(" Remember, you need 5 Wood and 50 G.\n\n")
-				sleep(2)
-				break
-
-	# The Weaponer needs time to make the weapon, and if not given it, this dialogue will play.
+	# The Weapon Maker needs time to make the weapon, and if not given it, this dialogue will play.
 	# The player will have to either explore the forest once, or sleep off the night to get past this point.
-	elif stat['quest'] == 2:
-		print_magenta(" Hey there! Progress on your weapon is going good.\n")
-		sleep(3)
-		print_magenta(" Give me a little more time, and I should be finished.\n")
-		sleep(3)
-		print_magenta(" I can't wait for you to see it!\n\n")
-		sleep(2.75)
+	elif game_stats["magic_weapon_status"] == 2:
+		dialogue("Hey there! Progress on your weapon is going good.", [], "magenta")
+		dialogue("Give me a little more time, and I should be finished.", [], "magenta")
+		dialogue("I can't wait for you to see it!", [], "magenta")
 
 
-	# Once the player has given the Weaponer time, they'll award the new weapon.
-	elif stat['quest'] == 3:
-		print_magenta(" Welcome back! I'm finally done!\n")
-		sleep(2)
-		print_magenta(" I present to you: the "+stat['magic_weapon']+"!\n")
-		sleep(3)
-		stat['ATT'] += 7
-		stat['mwc'] = False
-		stat['quest'] = 4
-		print_white("\n ATT rose by "), print_green("7!\n\n")
-		sleep(2.5)
-		if stat['magic_weapon'] == 'Vorpal Daggers': print_magenta(" Hope you like them!\n\n")
-		else: print_magenta(" Hope you like it!\n\n")
-		sleep(3)
+	# Once the player has given the Weapon Maker time, they'll award the new weapon.
+	elif game_stats["magic_weapon_status"] == 3:
+		game_stats["magic_weapon_status"] = 4
+		dialogue("Welcome back! I'm finally done!", [], "magenta")
+		weapon = "Storm Blade" if player.character_class == "Warrior" else "Blaze Rod" if player.character_class == "Sorcerer" else "Vorpal Daggers"
+		dialogue(f"I present to you: the {weapon}!", [], "magenta")
+		dialogue("ATT rose by 7!")
+
+		if player.character_class == "Warrior":
+			dialogue("I imbued that sword with the power of thunder, so it should be able to break any rocks you come across!", [], "magenta")
+		elif player.character_class == "Wizard":
+			dialogue("I imbued that staff with extra firepower, so it should be able to burn any trees you come across!", [], "magenta")
+		else:
+			dialogue("I imbued those daggers with void magic, so you should be able to teleport across any bodies of water you come across!", [], "magenta")
+			
+		# Explain how to use the weapon's special ability.
+		# This should be slightly different depending on whether or not the player has finished the Librarian's sidequest.
+		if game_stats["librarian"] > 2:
+			dialogue(f"The {weapon} can be used in the forest the same way you use scrolls.")
+		else: dialogue(f"To use the {weapon}'s special ability, press the [E] key in the field.")
+
+
+
+		# Since the rogue recieves the Vorpal Daggers as a pair, gramatically the Weapon Maker should refer to "them" rather than "it".
+		dialogue(f"Hope you like {'them' if player.character_class == 'Rogue' else 'it'}!", [], "magenta")
 
 
 	# If the player ever returns afterwards, this short dialogue plays.
-	elif stat['quest'] == 4:
-		print_magenta(" So, how's my magnum opus treating ya?\n")
-		sleep(3)
-		print_magenta(" I don't have anything else I can help you with, so get\n")
-		print_magenta(" out there and beat that orc!\n\n")
-		sleep(4.5)
+	elif game_stats["magic_weapon_status"] == 4:
+		dialogue("So, how's my magnum opus treating ya?", [], "magenta")
+		dialogue("I don't have anything else I can help you with, so get out there and beat that orc!", [], "magenta")
+
+
+	# If the player was shown the gold_box, hide it now.
+	if game_stats["magic_weapon_status"] < 2:
+		gold_box.hide()
+
+
+
+def librarian():
+
+	# This plays the first time the player meets the librarian.
+	if game_stats["librarian"] == 0:
+		dialogue("Oh. Hello...", [], "orange")
+		dialogue("What brings you around here?", ["Just checking things out."], "orange")
+		dialogue("Oh, that's cool...", [], "orange")
+		dialogue("Wait, are you that new adventurer?", [], "orange")
+		dialogue("I need your help.", [], "orange")
+		dialogue("As you must have heard, the other adventurers have had trouble finding the orc.", [], "orange")
+		dialogue("I think it's because it moves around so much...", [], "orange")
+		dialogue("So I thought, what if we map out the local area?", [], "orange")
+		dialogue("That way, you guys will be way less likely to get lost...", [], "orange")
+		dialogue("I've been asking all the other adventurers to help me out.", [], "orange")
+		x = dialogue("Will you help too?", ["Eh, why not?", "Heck yeah!", "No thanks!"], "orange")
+
+		if x == 2:
+			game_stats["librarian"] = 1
+			dialogue("Oh, okay then...", [], "orange")
+			dialogue("Well, if you change your mind, I'm right here.", [], "orange")
+		
+		else:
+			game_stats["librarian"] = 2
+			dialogue("Wait, really? Thanks!", [], "orange")
+			dialogue("Okay, so let's start by getting the first two areas...", [], "orange")
+			dialogue("Sketch down wherever you find the stairs up.", [], "orange")
+			dialogue("Then bring your maps back here...", [], "orange")
+			dialogue("I'll grab your reward in the meantime.", [], "orange")
+			dialogue("Okay, I'll see you later.", [], "orange")
+
+
+	elif game_stats["librarian"] == 1:
+		game_stats["librarian"] = 2
+		dialogue("Oh, welcome back...", [], "orange")
+		x = dialogue("Are you here to help now?", ["Fiiiiine", "Nope!"], "orange")
+
+		if x == 1:
+			dialogue("Are you just bullying me?", [], "orange")
+			dialogue("If so, please stop it.", ["Sorry, sorry."], "orange")
+			dialogue("Hmph.", [], "orange")
+
+		dialogue("I want you to start with the first two areas of the forest.", [], "orange")
+		dialogue("Make sure to write down where you found both pairs of stairs.", [], "orange")
+		dialogue("Even though you've been really mean, I'll try to prepare some reward in the meantime.", [], "orange")
+		dialogue("Okay, I'll see you later.", [], "orange")
+
+
+	elif game_stats["librarian"] == 2:
+		dialogue("Welcome back.", [], "orange")
+		dialogue("How's it coming along?", ["Here you go."], "orange")
+
+		if not (MAPS / "map_1.txt").exists():
+			dialogue("Wait, you haven't even gone into the forest yet?", [], "orange")
+			dialogue("Stop messing with me and at least do the bare minimum.", [], "orange")
+
+		elif not (MAPS / "map_2.txt").exists():
+			dialogue("You still haven't made it to the second floor?", [], "orange")
+			dialogue("Come back after at least trying.", [], "orange")
+
+		else:
+			f1 = open(MAPS / "map_1.txt", "r")
+			f2 = open(MAPS / "map_2.txt", "r")
+
+			missing_1 = False
+			if f1.read().count("|") < 1:
+				missing_1 = True
+				dialogue("You forgot to write down where the first stairs up are...", [], "orange")
+			if f2.read().count("|") < 1:
+				dialogue(f"You{' also' if missing_1 else ''} forgot to write down where the second set of stairs are...", [], "orange")
+				dialogue("Do that then come back here.", [], "orange")
+
+			if f1.read().count("|") < 1 or f2.read().count("|") < 1:
+				game_stats["librarian"] = 3
+				dialogue("This looks great...", [], "orange")
+				dialogue("For your reward, I found these scrolls.", ["Scrolls?"], "orange")
+				dialogue("Yeah. While exploring, sometimes trees and junk might block your path.", [], "orange")
+				dialogue("You can use a scroll to clear them out of the way.", [], "orange")
+				explain_scrolls()
+				dialogue("If you ever need any more, come back here and I'll sell you some.", [], "orange")
+				dialogue("Okay, good luck out there.", [], "orange")
+				
+	elif game_stats["librarian"] > 2:
+		if game_stats["librarian"] == 3:
+			game_stats["librarian"] = 4
+			dialogue("Welcome back...", [], "orange")
+			dialogue("I forgot to mention this earlier, but if you're ever well and truly stuck, come back here.", [], "orange")
+			dialogue("There's several paths up the mountain, and we can always start over from a new spot.", [], "orange")
+			line = "Anyways, what can I help you with?"
+
+
+		else:
+			line = "Welcome back. What can I do?"
+
+		gold_box.show()
+		
+		# Placing while loop to keep player in the menus until they want to leave.
+		while True:
+
+			x = dialogue(line, ["Buy Scrolls", "Start Over", "What scrolls do what?", "Leave"], "orange")
+
+			# This part here is for buying srolls.  
+			if x == 0:
+
+				line = "Which one? They all cost 15G."
+
+				while True:
+					x = dialogue(line, ["Fire Scroll", "Ice Scroll", "Thunder Scroll", "Never mind."], "orange")
+					if x != 3:
+						if player.gold < 15: dialogue("That's not enough gold. These things are expensive, you know.", [], "orange")
+						else:
+							player.gold -= 15
+							gold_box.update(player.gold)
+							dialogue("Here you are.", [], "orange")
+							if x == 0: player.items["Fire Scroll"] += 1
+							elif x == 1: player.items["Ice Scroll"] += 1
+							elif x == 2: player.items["Thunder Scroll"] += 1
+
+					# Return to the Buy/Start Over/Explanation Menu		
+					else:
+						break
+
+					line = "Any others?"
+
+
+			# The part for Starting Over
+			elif x == 1:
+				if dialogue("Are you sure? This will reset all progress made while exploring, sending you back to Floor 1.", ["Yes", "No"]) == 0:
+					x = dialogue("Okay, just hand me your old maps, and we can try to find a new spot to start.", ["Actually, never mind.", "Sure thing."], "orange")
+					if x == 0:
+						dialogue("Oh. Okay then.", [], "orange")
+					else:
+						for i in range(1, 16):
+							try:
+								(MAPS / f"level_{i}.png").unlink()
+								(MAPS / f"level_{i}.txt").unlink()
+								(MAPS / f"map_{i}.txt").unlink()
+							except:
+								break
+
+						dialogue("You hand over the maps and together look for a new starting location.")
+						while True:
+							dialogue("...")
+							dialogue("...")
+							dialogue("...!")
+							dialogue("The Librarian points at a spot on the map you two were looking over.")
+							if dialogue("Wait, what about here?", ["Looks good to me.", "'Bout as good as any other.", "Let's keep searching."], "orange") != 2:
+								
+								
+								
+								dialogue("Okay, I think an old adventurer already had something from here.", [], "orange")
+								if random() < .5: dialogue("Here's a copy of her old map for you.", [], "orange")
+								else: dialogue("Here's a copy of his old map for you.", [], "orange")
+							
+								level_layout, level_x, level_y = fetch_level(1, True)
+								padding = level_layout.pop()
+								level_layout = level_layout[1:]
+								map_layout = []
+
+								for i in range(len(level_layout)):
+									row = level_layout[i]
+									map_lower, map_upper = [], []
+									for j in row:
+
+										if j == "x":
+											pass
+
+										elif j == "|":
+											map_lower.append("g")
+											map_upper.append("|")
+										elif j == "/":
+											map_lower.append("g")
+											map_upper.append("/")
+										else:
+											if j == ".":
+												map_lower.append("g")
+											elif j == "W":
+												map_lower.append("b")
+											elif j == "X":
+												map_lower.append("o")
+											elif j == "R":
+												map_lower.append("y")
+											map_upper.append(".")
+
+									for j in range(15):
+										map_lower.append(".")
+										map_upper.append(".")
+									
+									map_layout.insert(i, map_lower)
+									map_layout.append(map_upper)
+
+								for i in range(15, 25):
+									map_layout.insert(i, ["." for j in range(30)])
+									map_layout.append(["." for j in range(30)])
+
+								level_layout.insert(0, padding)
+								level_layout.append(padding)
+									
+								save_and_close(1, level_layout, map_layout, len(gw.items))
+								break
+							
+							
+							
+							else:
+								dialogue("Okay then.", [], "orange")
+
+
+			# Explain scrolls again.
+			elif x == 2:
+				explain_scrolls()
+
+			# Let the player leave the library.
+			else:
+				break
+
+
+			line = "Anything else?"
+
+		
+		gold_box.hide()
+		dialogue("See you around!", [], "orange")
+
+		
+def explain_scrolls():
+	dialogue("Press the [E] key to use a scroll.")
+	dialogue("The Fire Scroll will burn up trees...", [], "orange")
+	dialogue("The Ice Scroll will freeze water...", [], "orange")
+	dialogue("And the Thunder Scroll will break rocks.", [], "orange")
+	dialogue("You can also use them in fights for massive damage.", [], "orange")
 
 
 
@@ -614,161 +694,132 @@ def magic_maker(stat):
 # It first does a quick check to see if the player has defeated the orc.
 # It then lets the player explore the town and use any of the above functions.
 # They can also explore the forest, drink potions, check their stats, and save and quit the game.
-def town(stat, e_stat):
+def town(player):
+
+	prior = len(gw.items)
+
+	background = Image(Point(750, 250), MAPS / "sprites" / "village.png")
+	background.draw(gw)
+
 	while True:
-		if stat['orc'] == "Dead":
-			return stat
+		if game_stats['orc'] == "Dead":
+			for i in gw.items[prior:]: i.undraw()
+			return
 
-		print(' Where would you like to go?')
-		saved = False
-		weaponer = stat['magic_weaponer']
-		while True:
-			print_yellow(' [S]hop    [I]nn    ['+weaponer[0]+']'+weaponer[1:]+'    [E]xplore Forest    [M]ore')
-			x = input(' >>> ').lower()
-			print()
-			if x!='s' and x!='i' and x!=weaponer[0].lower() and x!='e' and x!='m':
-				invalid()
-			elif x=='s':
-				saved = False
-				shop(stat)
-				break
+		if game_stats["town_tutorial"]:
+			game_stats["town_tutorial"] = False
+			dialogue("Welcome to the world of Console Quest!")
+			dialogue("You work at the Adventurer's Guild in the city of Krocus.")
+			dialogue("After gaining some experience completing small quests, you've decided to go on your first major one.")
+			dialogue("A small village in the backcountry has been forced to pay tributes to an orc for several years.")
+			dialogue("It regulaly moves around, so other adventures have had trouble finding and slaying it.")
+			dialogue("Up until now, the villagers have been able to keep the orc satisfied.")
+			dialogue("But recently, it's been asking for ever larger tributes, and the villagers won't be able to keep paying for much longer.")
+			dialogue("Find the orc, and kill him before he attacks and kills the townsfolk.")
+			dialogue("You just arrived in town the other day, so many of the villagers only know rumors of you.")
+			dialogue("Use [W][A][S][D] or the arrow keys to navigate the town.")
+			dialogue("The Pause Menu can be accessed with the [M] key.")
+			dialogue("Feel free to introduce yourself, or head straight out into the forest to start your search for the orc!")
+		
 
-			elif x=='i':
-				saved = False
-				inn(stat)
-				break
+		x = dialogue("Where would you like to go?", [
+			"Inn", 
+			"Wizard" if player.character_class == "Sorcerer" else "Blacksmith",
+			"Shop",
+			"Librarian",
+			"Explore Forest"], right=True)
 
-			elif x==weaponer[0].lower():
-				saved = False
-				magic_maker(stat)
-				break
+		if x == 0:
+			inn()
 
-			elif x=='e':
-				saved = False
-				exploring(stat, e_stat)
-				break
+		if x == 1:
+			weapon_maker()
+
+		if x == 2:
+			shop()
+
+		if x == 3:
+			librarian()
+			pass
+		
+		if x == 4:
+			i = 0
+			while True:
+				try:
+					i += 1
+					x = Path(MAPS / f"level_{i}.txt").read_text().split("\n")
+					
+
+					background = PIL_Image.open(MAPS / f"level_{i}.png")
+					flower = PIL_Image.open(MAPS / "sprites" / "harvest1.png")
+
+					for j in range(len(x)):
+						line = list(x[j])
+
+						for k in range(len(line)):
+
+							if line[k] in ["B", "C", "D", "E"]:
+								if randint(0, 2) == 0:
+									line[k] = chr(ord(x[j][k]) - 1)
+									if line[k] == "A":
+										background.paste(flower, (k * 48, j * 48))
+
+						x[j] = "".join(line)
+					
+					background.save(MAPS / f"level_{i}.png")
+
+					file = open(MAPS / f"level_{i}.txt", "w")
+					file.write("\n".join(x))
+					file.close()
+				except:
+					break
+			
+			choices = []
+			if (MAPS / "level_15.txt").exists():
+				choices.append("Go to Floor 15")
+			if (MAPS / "level_11.txt").exists():
+				choices.append("Go to Floor 11")
+			if (MAPS / "level_6.txt").exists():
+				choices.append("Go to Floor 6")
+				choices.append("Go to Floor 1")
+
+			if choices:
+				x = dialogue("Where would you like to go?", choices, return_arg=True, right=True)
+				if x.count("15") > 0:
+					exploring(15)
+				elif x.count("11") > 0:
+					exploring(11)
+				elif x.count("6") > 0:
+					exploring(6)
+				else:
+					exploring(1)
+				
+			else: exploring(1)
 
 			
 
-			elif x=='m':
-				while True:
-
-					# These [M]ore statements cycle back and forth into each other.
-					print_yellow(' [C]heck Stats    [P]otion ('+str(stat['potions'])+')    [S]ave Game    [Q]uit    [M]ore')
-					y = input(" >>> ").lower()
-					print()
-					if y!='c' and y!='p' and y!='s' and y!='q' and y!='m':
-						invalid()
-					elif y=='c':
-						check_stats(stat)
-
-					elif y=='p':
-						
-						# Just in case the player no longer has any potions:
-						if stat['potions'] == 0:
-							print(' Out of potions.\n')
-							sleep(.5)
-
-						# Otherwise, restore their health. Tell the player so.
-						else:
-							saved = False
-							stat['potions'] -= 1
-							stat['current_HP'] += round(random.randint(4,10)* 4.2)
-
-							if stat['current_HP'] > stat['base_HP']:
-								stat['current_HP'] = stat['base_HP']
-
-							print_white(' HP restored to '), print_green(str(stat['current_HP'])+'/'+str(stat['base_HP'])+'\n')
-
-					# I want to specially point out the save function here.
-					# It allows the player to save their game to a file called "save_state.txt".
-					# The way it does this is by making an empty string called line_to_save and a list called stats_to_save.
-					# Those stats are then added to the empty string followed by a comma nd space.
-					# That string is then converted into bytes to be coded into base64, so the player can't easily just goin in and change their stats.
-					# Those base64 bytes are again converted back into a string so it can be printed to the txt file.
-					elif y=='s':
-						saved = True
-						save_state = Path('save_state.txt')
-						line_to_save = ''
-						stats_to_save = [stat['p_name'], stat['p_class'], stat['p_LV'], stat['ATT'], stat['ATT_type'],
-							stat['p_DEF'], stat['current_HP'], stat['base_HP'], stat['current_exp'], stat['next_level_exp'],
-							stat['potions'], stat['p_G'], stat['quest'], stat['magic_weapon'], stat['mwc'],
-							stat['magic_weaponer'], stat['magic_item_type'], stat['magic_item'], stat['shield'], stat['rathat'],
-							stat['shopbro'], stat['p_left'], stat['fairies'], stat['inn'], stat['orc'], stat['user']]
-
-						for i in stats_to_save:
-							line_to_save = line_to_save + str(i) + ", "
-
-						save_state.write_text(str(base64.standard_b64encode(line_to_save[:-2].encode('utf-8')))[2:-1])
-
-						print(" Game saved.\n")
-
-
-					# This line lets the player quit the game.
-					# Littered throughtout the above function has been the variable 'saved'.
-					# If the player has done something that would have changed their state, like going to the shops, or drinking potions, their state would be different from when they saved.
-					# As such, the player is reminded to if they haven't saved.
-					# However, if they have, and have only check their stats or some such, they're state is no different from the last save, to the reminder won't play.
-					# I also give a quick prompt just in case they still want to continue, so they can back out of quiting.
-					elif y=='q':
-						print_white(" Are you sure?")
-						if saved == False: print_white(" (Since you haven't saved, data might be lost.)")
-						while True:
-							print_yellow(' [Y]es    [N]o')
-							x = input(' >>> ').lower()
-							print()
-							if x!='y' and x!='n':
-								invalid()
-							elif x=='y':
-								sys.exit(0)
-
-							elif x=='n':
-								break
-
-					elif y=='m':
-						break
+			
 
 
 
 # The function for testing the town, to make sure everything works.
 if __name__ == '__main__':
 
-	stat = {
-		'p_name': 'Grog',
-		'p_class': 'Warrior',
-		'p_LV': 3,
-		'ATT': 5,
-		'ATT_type': 'slashes at',
-		'p_DEF': 9,
-		'current_HP': 17,
-		'base_HP': 17,
-		'current_exp': 0,
-		'next_level_exp': 4,
-		'potions': 0,
-		'p_G': 100,
-		'quest': 0,
-		'magic_weapon': 'Sun Sword',
-		'mwc': False,
-		'magic_weaponer': 'Blacksmith',
-		'magic_item_type': 'Ore',
-		'magic_item': 3,
-		'shield': True,
-		'rathat': False,
-		'shopbro': -1,
-		'p_left': 4,
-		'fairies': 1,
-		'inn': 0,
-		'orc': False
-		}
+	# name, character_class, lv, ATT, DEF, current_HP, base_HP, current_EXP, next_EXP, gold, items
+	player = Player("Fief", "Rogue", 5, 10, 15, 8, 20, 100, 200, 50, 
+		{"Shield": 0,
+		"Potions": 3,
+		"Apples": 3,
+		"magic_item": 0,
+		"Fire Scroll": 3,
+		"Thunder Scroll": 2,
+		"Ice Scroll": 3
+		})
 
-	e_stat = {
-		'e_type': "Raq Coon, Bane of Chickens",
-		'e_DEF': 10000,
-		'e_HP': 10000,
-		'e_LV': 30,
-		'e_EXP': 0,
-		'e_G': 0,
-		}
+	game_stats["librarian"] = 4
+	game_stats["town_tutorial"] = False
+	game_stats["level_tutorial"] = False
 
-	shop(stat)
-	#town(stat, e_stat)
+	gold_box = GoldBox(player.gold)
+	town(player)
+	gw.getKey()

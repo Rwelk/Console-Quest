@@ -39,8 +39,6 @@ def complete(stat):
 
 
 
-
-
 # The "Caravan" event nets the player some extra gold and potions.
 # It is the only source of potions if they fail the shopbro() event.
 def caravan(stat):

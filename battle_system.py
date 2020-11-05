@@ -6,8 +6,7 @@ import sys
 import random
 from time import sleep
 from leveling_system import level_up
-
-
+from colored_text import *
 
 # This is the battle system that gets triggered whenever a battle happens.
 # Make sure it's formatted as:
@@ -66,7 +65,7 @@ def battle(stat, e_stat):
 					damage = round(random.randint(1,5) + (stat['ATT']/2.5))
 					e_stat['e_HP'] -= damage
 					print_white(' '+stat['p_name']+" "+stat['ATT_type']+" the enemy for "), print_red(str(damage)+' DMG.\n')
-					if e_stat['e_HP'] <0:
+					if e_stat['e_HP'] < 0:
 						e_stat['e_HP'] = 0
 					sleep(.75)
 
